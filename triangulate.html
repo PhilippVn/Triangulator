@@ -124,6 +124,9 @@
     }
 
     function drawVertices() {
+      if(polygonFinished){
+        return;
+      }
       context.lineWidth = circleStrokeWidth;
       context.strokeStyle = finalEdgeColor;
       for (let vertex of graphAdjList.keys()) {
@@ -133,7 +136,7 @@
         
         if(vertex == graphAdjList.keys().next().value){
           context.fill();
-        }else{
+        }else if(vertex == lastVertex){
           context.stroke();
         }
       }
