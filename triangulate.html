@@ -18,7 +18,8 @@
         <div class="mt-3">
           <button class="btn btn-primary" onclick="clearAll()">Clear</button>
           <button class="btn btn-success" onclick="triangulatePolygon()">Triangulate</button>
-          <input type="range" class="form-range" id="triangulationSlider" min="1" max="100" step="1" value="1" oninput="updateSliderValue()">
+          <input type="range" class="form-range" id="triangulationSlider" min="1" max="100" step="1" value="1"
+            oninput="updateSliderValue()">
           <p id="sliderValue">Triangulation Level: 1</p>
         </div>
       </div>
@@ -49,8 +50,10 @@
     const snippingRadius = 8;
     const edgeStrokeWidth = 4;
     const circleStrokeWidth = 1;
+    const intersectionPointRadius = 5;
     const draggedEdgeColor = "darkgray"
     const finalEdgeColor = "black"
+    const intersectionPointColor = "red";
 
     const DEBUG_MODE = true;
 
@@ -105,28 +108,137 @@
       renderDebugInfo()
     }
 
+    function getLineIntersections() {
+      let intersectionPoints = [];
+      let edges = getAllEdges();
+      const epsilon = 1e-10; // Choose an appropriate epsilon value based on your precision needs
 
-    function checkForLineIntersections(){
-      // TODO
+      for (let edge of edges) {
+        for (let otherEdge of edges) {
+          let edgePoint1 = edge[0];
+          let edgePoint2 = edge[1];
+          let otherEdgePoint1 = otherEdge[0];
+          let otherEdgePoint2 = otherEdge[1];
+
+          if (
+            (edgePoint1.x === otherEdgePoint1.x && edgePoint1.y === otherEdgePoint1.y) ||
+            (edgePoint1.x === otherEdgePoint2.x && edgePoint1.y === otherEdgePoint2.y) ||
+            (edgePoint2.x === otherEdgePoint1.x && edgePoint2.y === otherEdgePoint1.y) ||
+            (edgePoint2.x === otherEdgePoint2.x && edgePoint2.y === otherEdgePoint2.y)
+          ) {
+            continue; // Skip if they share an endpoint
+          }
+
+          let x1 = edgePoint1.x;
+          let y1 = edgePoint1.y;
+          let x2 = edgePoint2.x;
+          let y2 = edgePoint2.y;
+
+          let x3 = otherEdgePoint1.x;
+          let y3 = otherEdgePoint1.y;
+          let x4 = otherEdgePoint2.x;
+          let y4 = otherEdgePoint2.y;
+
+          // Check if both lines are vertical
+          if (x1 === x2 && x3 === x4) {
+            // Lines are both vertical and parallel, no intersection
+            continue;
+          }
+
+          let t, u;
+
+          // Check if the first line is vertical
+          if (x1 === x2) {
+            t = (x1 - x3) / (x4 - x3);
+            u = (y1 + t * (y2 - y1) - y3) / (y4 - y3);
+          } else if (x3 === x4) {
+            // Check if the second line is vertical
+            u = (x1 + t * (x2 - x1) - x3) / (x4 - x3);
+            t = (y3 - y1) / (y2 - y1);
+          } else {
+            // Standard case for non-vertical lines
+            t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / ((x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4));
+            u = ((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2)) / ((x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4));
+          }
+
+          if (0 <= t && t <= 1 && 0 <= u && u <= 1 && Math.abs(t) > epsilon && Math.abs(1 - t) > epsilon && Math.abs(u) > epsilon && Math.abs(1 - u) > epsilon) {
+            // Intersection point
+            let intersectionX, intersectionY;
+
+            if (x1 === x2) {
+              // First line is vertical
+              intersectionX = x1;
+              intersectionY = y1 + t * (y2 - y1);
+            } else if (x3 === x4) {
+              // Second line is vertical
+              intersectionX = x3;
+              intersectionY = y3 + u * (y4 - y3);
+            } else {
+              // Standard case for non-vertical lines
+              intersectionX = x1 + t * (x2 - x1);
+              intersectionY = y1 + t * (y2 - y1);
+            }
+
+            // Check if it's an endpoint intersection
+            if (
+              (Math.abs(intersectionX - x1) < Number.EPSILON && Math.abs(intersectionY - y1) < Number.EPSILON) ||
+              (Math.abs(intersectionX - x2) < Number.EPSILON && Math.abs(intersectionY - y2) < Number.EPSILON) ||
+              (Math.abs(intersectionX - x3) < Number.EPSILON && Math.abs(intersectionY - y3) < Number.EPSILON) ||
+              (Math.abs(intersectionX - x4) < Number.EPSILON && Math.abs(intersectionY - y4) < Number.EPSILON)
+            ) {
+              continue; // Skip if it's an endpoint intersection
+            }
+
+            // Handle the actual intersection
+            console.log("Intersection at:", intersectionX, intersectionY);
+            intersectionPoints.push(new Point2d(intersectionX,intersectionY));
+          }
+        }
+      }
+
+      return intersectionPoints;
     }
 
 
-    function triangulatePolygon(){
-      // TODO
+    function getAllEdges() {
+      let edges = [];
+      for (let entry of graphAdjList.entries()) {
+        let vertex = entry[0];
+        let neighbours = entry[1];
+        for (let neighbour of neighbours) {
+          edges.push([new Point2d(vertex.x, vertex.y), new Point2d(neighbour.x, neighbour.y)]);
+        }
+      }
+      return edges;
     }
 
-    function _initialTriangulation(){
+
+    function triangulatePolygon() {
+      const intersections = getLineIntersections();
+      // TODO
+      if (intersections.length > 0) {
+        context.fillStyle = intersectionPointColor;
+        for(let intersection of intersections){
+          context.beginPath();
+          context.arc(intersection.x,intersection.y, intersectionPointRadius, 0, 2*Math.PI);
+          context.fill();
+        }
+        window.alert("Invalid Polygon!\nIt contains intersecting edges (Marked red).\nPress 'Clear' to start again.");
+      }
+    }
+
+    function _initialTriangulation() {
       // TODO
     }
 
     // Triangulates 2-n by dividing the triangles from _initialTriangulation in half in each iteration
-    function _iterativeTriangulation(n){
+    function _iterativeTriangulation(n) {
       // TODO
     }
 
 
 
-    function clearAll(){
+    function clearAll() {
       graphAdjList = new Map();
       lastVertex = null;
       polygonFinished = false;
@@ -157,7 +269,7 @@
     }
 
     function pointInCircle(/** @type {Point2d} */ point,/** @type {Vertex} */ center,/** @type {Number} */ radius) {
-      return (point.x - center.x) ** 2 + (point.y - center.y) ** 2 <= radius**2;
+      return (point.x - center.x) ** 2 + (point.y - center.y) ** 2 <= radius ** 2;
     }
 
 
@@ -166,19 +278,20 @@
     }
 
     function drawVertices() {
-      if(polygonFinished){
+      if (polygonFinished) {
         return;
       }
       context.lineWidth = circleStrokeWidth;
       context.strokeStyle = finalEdgeColor;
+      context.fillStyle = finalEdgeColor;
       for (let vertex of graphAdjList.keys()) {
         context.beginPath();
         context.arc(vertex.x, vertex.y, snippingRadius, 0, 2 * Math.PI);
-        
-        
-        if(vertex == graphAdjList.keys().next().value){
+
+
+        if (vertex == graphAdjList.keys().next().value) {
           context.fill();
-        }else if(vertex == lastVertex){
+        } else if (vertex == lastVertex) {
           context.stroke();
         }
       }
