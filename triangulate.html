@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Include Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <title>Triangulater</title>
+</head>
+
+<body>
+  <div class="container">
+    <div class="row">
+      <div class="col-md-8">
+        <h1 class="mt-4">Triangulate any Polygon</h1>
+        <canvas id="myCanvas" width="700" height="700" style="border:1px solid #000;"></canvas>
+      </div>
+      <div id="debugInfo" class="col-md-4" style="visibility: hidden;">
+        <div class="mt-4 p-3 border">
+          <h2 class="border-bottom pb-2">Debug Information</h2>
+          <!-- Add your debug information here -->
+          <p id="graphAdjListDebug" class="border-top pt-2"><span id="graphAdjListValue">Value</span></p>
+          <p id="polygonFinishedDebug" class="border-top pt-2"><span id="polygonFinishedValue">Value</span></p>
+          <p id="draggedFromVertexDebug" class="border-top pt-2"><span id="draggedFromVertexValue">Value</span></p>
+          <!-- You can add more debug information as needed -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Include Bootstrap JS (optional) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Your custom JavaScript for canvas interactions -->
+
+  <script>
+    const canvas = document.getElementById('myCanvas');
+    /** @type {CanvasRenderingContext2D} */
+    const context = canvas.getContext('2d');
+
+    const snippingRadius = 8;
+    const edgeStrokeWidth = 4;
+    const circleStrokeWidth = 1;
+    const draggedEdgeColor = "darkgray"
+    const finalEdgeColor = "black"
+
+    const DEBUG_MODE = true;
+
+    let polygonFinished = false; // a polygon is finished if the 
+    let lastVertex = null;
+
+
+
+    /** @type {Map<Vertex,[]>} */
+    let graphAdjList = new Map(); // map of vertices and their neighbours
+
+    class Vertex {
+      constructor(x, y, identifier) {
+        this.x = x;
+        this.y = y;
+        this.identifier = identifier;
+      }
+
+      toString() {
+        return `Vertex ${this.identifier}: x=${this.x} y=${this.y}`;
+      }
+    }
+
+    class Point2d {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+      }
+    }
+
+    function map2String() {
+      let str = "{";
+      for (let entry of graphAdjList.entries()) {
+        str += entry[0].toString() + " [";
+        for (let vertex of entry[1]) {
+          str += vertex.identifier + ",";
+        }
+        str = str.substring(0, str.length - 1);
+        str += "]\n";
+      }
+
+      return str + "}";
+    }
+
+    function main() {
+      // Event listeners for mouse down, move, and up
+      canvas.addEventListener('mousedown', mouseDownHandler);
+      canvas.addEventListener('mousemove', mouseMoveHandler);
+      canvas.addEventListener('mouseup', mouseUpHandler);
+      renderDebugInfo()
+    }
+
+
+
+    function getMousePoint(/** @type {MouseEvent} */ mouseevent) {
+      let bounds = canvas.getBoundingClientRect();
+      return new Point2d((mouseevent.clientX - bounds.left) / (bounds.right - bounds.left) * canvas.width, (mouseevent.clientY - bounds.top) / (bounds.bottom - bounds.top) * canvas.height);
+    }
+
+    function renderDebugInfo() {
+      if (DEBUG_MODE) {
+        document.getElementById("debugInfo").style.visibility = 'visible';
+      }
+      document.getElementById("graphAdjListDebug").innerText = "graphAdjList: " + map2String(graphAdjList);
+      document.getElementById("polygonFinishedDebug").innerText = "polygonFinished: " + polygonFinished;
+      document.getElementById("draggedFromVertexDebug").innerText = "draggedFromVertex: " + (lastVertex == null ? "null" : lastVertex.toString());
+    }
+
+    function pointInCircle(/** @type {Point2d} */ point,/** @type {Vertex} */ center,/** @type {Number} */ radius) {
+      return (point.x - center.x) ** 2 + (point.y - center.y) ** 2 <= radius**2;
+    }
+
+
+
+
+    function clearCanvas() {
+      context.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function drawVertices() {
+      context.lineWidth = circleStrokeWidth;
+      context.strokeStyle = finalEdgeColor;
+      for (let vertex of graphAdjList.keys()) {
+        context.beginPath();
+        context.arc(vertex.x, vertex.y, snippingRadius, 0, 2 * Math.PI);
+        
+        
+        if(vertex == graphAdjList.keys().next().value){
+          context.fill();
+        }else{
+          context.stroke();
+        }
+      }
+    }
+
+    function drawEdges() {
+      context.lineWidth = edgeStrokeWidth;
+      context.strokeStyle = finalEdgeColor;
+      for (let mapping of graphAdjList.entries()) {
+        let from = mapping[0];
+        for (let vertex of mapping[1]) {
+          context.beginPath();
+          context.moveTo(from.x, from.y);
+          context.lineTo(vertex.x, vertex.y)
+          context.stroke();
+        }
+
+      }
+    }
+
+    function redraw() {
+      clearCanvas();
+      drawVertices();
+      drawEdges();
+    }
+
+
+    function mouseDownHandler(/** @type {MouseEvent} */ mouseevent) {
+      // check if within snipping area of any vertex -> if yes dont create a new vertex but draw from it
+      // if not and there is already a vertex ignore it
+      let point = getMousePoint(mouseevent);
+
+
+      // what happens when user presses down mouse button?
+      // if there is not a vertex already create a new vertex at the pressed point and set it as the last vertex and add it to the graph
+      // if there is at least one vertex already
+      // if its within clipping radius of the last vertex do nothing
+      // if its outside then create a new vertex that has the last vertex as neighbour and the set the new vertex at neighbour of the last vertex
+      // set the new vertex as the last vertex
+
+      if (polygonFinished) {
+        polygonFinished = false;
+        graphAdjList = new Map();
+        lastVertex = null;
+      }
+      renderDebugInfo();
+
+      if (lastVertex == null) {
+        // first vertex
+        let newVertex = new Vertex(point.x, point.y, graphAdjList.size);
+        graphAdjList.set(newVertex, []);
+        lastVertex = newVertex;
+        renderDebugInfo();
+      } else {
+        // check if user clicked within lastvertex
+        if (pointInCircle(point, lastVertex, snippingRadius)) {
+          redraw();
+          renderDebugInfo();
+          return;
+        }
+
+        let startingVertex = graphAdjList.keys().next().value;
+
+        if (pointInCircle(point, startingVertex, snippingRadius)) {
+          polygonFinished = true;
+          graphAdjList.get(lastVertex).push(startingVertex);
+          graphAdjList.get(startingVertex).push(lastVertex);
+          redraw();
+          renderDebugInfo();
+          return;
+        }
+
+        // create new vertex
+        let newVertex = new Vertex(point.x, point.y, graphAdjList.size);
+        graphAdjList.get(lastVertex).push(newVertex);
+        graphAdjList.set(newVertex, [lastVertex]);
+        lastVertex = newVertex;
+      }
+      redraw();
+      renderDebugInfo();
+    }
+
+
+    function mouseMoveHandler(/** @type {MouseEvent} */ mouseevent) {
+      /** @type {Point2d} */
+      let point = getMousePoint(mouseevent);
+
+      // just draw a line from the last vertex to the current point
+
+      if (lastVertex == null || polygonFinished) {
+        return;
+      }
+
+      redraw();
+      context.lineWidth = edgeStrokeWidth;
+      context.strokeStyle = draggedEdgeColor;
+      context.beginPath();
+      context.moveTo(lastVertex.x, lastVertex.y);
+      context.lineTo(point.x, point.y);
+      context.stroke()
+    }
+
+    function mouseUpHandler(/** @type {MouseEvent} */ mouseevent) {
+      /** @type {Point2d} */
+      let point = getMousePoint(mouseevent);
+
+      // what happens when the user releases the mouse button after (moving&) pressing?
+      // if the user didnt move do nothing => last vertex is still selected (there will always be a vertex)
+      // if the point changed this means the user moved while pressing down
+
+      if (pointInCircle(point, lastVertex, snippingRadius)) {
+        redraw();
+        renderDebugInfo();
+        return;
+      }
+
+      let startingVertex = graphAdjList.keys().next().value;
+
+      if (pointInCircle(point, startingVertex, snippingRadius)) {
+        if (!polygonFinished) {
+          polygonFinished = true;
+          graphAdjList.get(lastVertex).push(startingVertex);
+          graphAdjList.get(startingVertex).push(lastVertex);
+        }
+        redraw();
+        renderDebugInfo();
+        return;
+      }
+
+
+      let newVertex = new Vertex(point.x, point.y, graphAdjList.size);
+      graphAdjList.get(lastVertex).push(newVertex);
+      graphAdjList.set(newVertex, [lastVertex]);
+      lastVertex = newVertex;
+      renderDebugInfo();
+      redraw();
+    }
+
+
+
+    window.onload = function () {
+      main();
+    };
+  </script>
+
+</body>
+
+</html>
