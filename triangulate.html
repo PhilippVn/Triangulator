@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Include Bootstrap CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <title>Triangulater</title>
+  <title>Triangulator</title>
 </head>
 
 <body>
@@ -14,7 +14,13 @@
     <div class="row">
       <div class="col-md-8">
         <h1 class="mt-4">Triangulate any Polygon</h1>
-        <canvas id="myCanvas" width="700" height="700" style="border:1px solid #000;"></canvas>
+        <canvas id="myCanvas" width="700" height="600" style="border:1px solid #000;"></canvas>
+        <div class="mt-3">
+          <button class="btn btn-primary" onclick="clearAll()">Clear</button>
+          <button class="btn btn-success" onclick="triangulatePolygon()">Triangulate</button>
+          <input type="range" class="form-range" id="triangulationSlider" min="1" max="100" step="1" value="1" oninput="updateSliderValue()">
+          <p id="sliderValue">Triangulation Level: 1</p>
+        </div>
       </div>
       <div id="debugInfo" class="col-md-4" style="visibility: hidden;">
         <div class="mt-4 p-3 border">
@@ -28,6 +34,7 @@
       </div>
     </div>
   </div>
+
 
   <!-- Include Bootstrap JS (optional) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -46,6 +53,8 @@
     const finalEdgeColor = "black"
 
     const DEBUG_MODE = true;
+
+    let triangulationLevel = 1;
 
     let polygonFinished = false; // a polygon is finished if the 
     let lastVertex = null;
@@ -97,6 +106,41 @@
     }
 
 
+    function checkForLineIntersections(){
+      // TODO
+    }
+
+
+    function triangulatePolygon(){
+      // TODO
+    }
+
+    function _initialTriangulation(){
+      // TODO
+    }
+
+    // Triangulates 2-n by dividing the triangles from _initialTriangulation in half in each iteration
+    function _iterativeTriangulation(n){
+      // TODO
+    }
+
+
+
+    function clearAll(){
+      graphAdjList = new Map();
+      lastVertex = null;
+      polygonFinished = false;
+      clearCanvas();
+      renderDebugInfo();
+    }
+
+    function updateSliderValue() {
+      var sliderValue = document.getElementById("triangulationSlider").value;
+      document.getElementById("sliderValue").innerText = "Triangulation Level: " + sliderValue;
+      triangulationLevel = sliderValue;
+    }
+
+
 
     function getMousePoint(/** @type {MouseEvent} */ mouseevent) {
       let bounds = canvas.getBoundingClientRect();
@@ -115,8 +159,6 @@
     function pointInCircle(/** @type {Point2d} */ point,/** @type {Vertex} */ center,/** @type {Number} */ radius) {
       return (point.x - center.x) ** 2 + (point.y - center.y) ** 2 <= radius**2;
     }
-
-
 
 
     function clearCanvas() {
