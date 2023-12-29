@@ -93,7 +93,7 @@
         return (Math.abs(this.x - otherPoint.x) < Number.EPSILON) && (Math.abs(this.y - otherPoint.y) < Number.EPSILON);
       }
 
-      isEndpointIntersectionPoint(){
+      isEndpointIntersectionPoint() {
         return this.x < 0 && this.y < 0;
       }
     }
@@ -229,7 +229,7 @@
         (Math.abs(intersectionX - x3) < Number.EPSILON && Math.abs(intersectionY - y3) < Number.EPSILON) ||
         (Math.abs(intersectionX - x4) < Number.EPSILON && Math.abs(intersectionY - y4) < Number.EPSILON)
       ) {
-        return new Point2d(-1,-1);
+        return new Point2d(-1, -1);
       }
       else { return new Point2d(intersectionX, intersectionY); }
     }
@@ -248,7 +248,7 @@
           if (checkIfTwoEdgesIntersect(new Edge(edgePoint1, edgePoint2), new Edge(otherEdgePoint1, otherEdgePoint2))) {
             // Intersection point
             let intersectionPoint = getEdgeIntersectionPoint(new Edge(edgePoint1, edgePoint2), new Edge(otherEdgePoint1, otherEdgePoint2));
-            if(!(intersectionPoint.x < 0 && intersectionPoint.y < 0)){
+            if (!(intersectionPoint.x < 0 && intersectionPoint.y < 0)) {
               intersectionPoints.push(intersectionPoint);
             }
           }
@@ -323,17 +323,17 @@
 
         if (!contains) {
           edges.push(new Edge(edge[0], edge[1]));
-        } 
+        }
       }
 
       return edges;
     }
 
-    function getPolygon(){
+    function getPolygon() {
       let points = [];
 
-      for (let vertex of graphAdjList.keys()){
-        points.push(new Point2d(vertex.x,vertex.y))
+      for (let vertex of graphAdjList.keys()) {
+        points.push(new Point2d(vertex.x, vertex.y))
       }
 
       return new Polygon(points, getAllPolygonEdges());
@@ -342,7 +342,7 @@
     function _initialTriangulation() {
       // triangluation by diagonals
       let polygon = getPolygon();
-      
+
 
       if (polygon.edges.length < 3) {
         window.alert("A Line is not a Polygon!\nPress 'Clear' to start again.");
@@ -353,37 +353,41 @@
       console.log("Is triangle? " + isTriangle(polygon));
 
 
-      for(let vertex1 of graphAdjList.keys()){
-        for(let vertex2 of graphAdjList.keys()){
+      for (let vertex1 of graphAdjList.keys()) {
+        for (let vertex2 of graphAdjList.keys()) {
           polygon = getPolygon();
-          if(vertex2 == vertex1){
+          if (vertex2 == vertex1) {
             continue;
           }
           // check if its a neigbour -> already an edge
-          if(graphAdjList.get(vertex1).includes(vertex2)){
+          if (graphAdjList.get(vertex1).includes(vertex2)) {
             continue;
           }
 
           // create a edge to the vertex if it doesnt intersect with any other edge
-          let potentialEdge = new Edge(new Point2d(vertex1.x,vertex1.y),new Point2d(vertex2.x,vertex2.y));
+          let potentialEdge = new Edge(new Point2d(vertex1.x, vertex1.y), new Point2d(vertex2.x, vertex2.y));
           let isIntersecting = false;
-          for(let edge of polygon.edges){
-            if(checkIfTwoEdgesIntersect(potentialEdge,edge)){
-              let intersectionpoint = getEdgeIntersectionPoint(potentialEdge,edge);
-              if(!intersectionpoint.isEndpointIntersectionPoint()){
+          for (let edge of polygon.edges) {
+            if (checkIfTwoEdgesIntersect(potentialEdge, edge)) {
+              let intersectionpoint = getEdgeIntersectionPoint(potentialEdge, edge);
+              if (!intersectionpoint.isEndpointIntersectionPoint()) {
                 isIntersecting = true;
                 break;
               }
             }
           }
 
-          if(!isIntersecting){
-            // add new Edge
-            graphAdjList.get(vertex1).push(vertex2);
-            graphAdjList.get(vertex2).push(vertex1);
-            renderDebugInfo();
-            redraw();
+          if (isIntersecting) {
+            continue;
           }
+
+          // TODO check if the edge is inside the polygon
+
+          // add new Edge
+          graphAdjList.get(vertex1).push(vertex2);
+          graphAdjList.get(vertex2).push(vertex1);
+          renderDebugInfo();
+          redraw();
         }
       }
 
