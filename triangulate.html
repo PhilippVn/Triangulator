@@ -18,7 +18,7 @@
         <div class="mt-3">
           <button class="btn btn-primary" onclick="clearAll()">Clear</button>
           <button class="btn btn-success" onclick="triangulatePolygon()">Triangulate</button>
-          <input type="range" class="form-range" id="triangulationSlider" min="1" max="100" step="1" value="1"
+          <input type="range" class="form-range" id="triangulationSlider" min="1" max="10" step="1" value="1"
             oninput="updateSliderValue()">
           <p id="sliderValue">Triangulation Level: 1</p>
         </div>
@@ -55,7 +55,8 @@
     const finalEdgeColor = "black";
     const intersectionPointColor = "red";
 
-    const DEBUG_MODE = true;
+    const DEBUG_MODE = false;
+    const INTERPOLATION_COUNT = 100;
 
     let triangulationLevel = 1;
 
@@ -93,7 +94,7 @@
         return (Math.abs(this.x - otherPoint.x) < Number.EPSILON) && (Math.abs(this.y - otherPoint.y) < Number.EPSILON);
       }
 
-      isEndpointIntersectionPoint() {
+      isEndpointIntersection() {
         return this.x < 0 && this.y < 0;
       }
     }
@@ -222,19 +223,26 @@
         intersectionY = y1 + t * (y2 - y1);
       }
 
-      // Check if it's an endpoint intersection
+      // Check if it's an endpoint intersection that means both lines intersect at their endpoints
+      // intersectionPoint == edge1.Start && edge2.Start
+      // intersectionPoint == edge1.Start && edge2.end
+      // intersectionPoint == edge2.Start && edge1.end
+      // intersectionPoint == edge1.end && edge2.end
+      const intersectionPoint = new Point2d(intersectionX, intersectionY);
+
       if (
-        (Math.abs(intersectionX - x1) < Number.EPSILON && Math.abs(intersectionY - y1) < Number.EPSILON) ||
-        (Math.abs(intersectionX - x2) < Number.EPSILON && Math.abs(intersectionY - y2) < Number.EPSILON) ||
-        (Math.abs(intersectionX - x3) < Number.EPSILON && Math.abs(intersectionY - y3) < Number.EPSILON) ||
-        (Math.abs(intersectionX - x4) < Number.EPSILON && Math.abs(intersectionY - y4) < Number.EPSILON)
+        (intersectionPoint.equals(edge1.start) && intersectionPoint.equals(edge2.start)) ||
+        (intersectionPoint.equals(edge1.start) && intersectionPoint.equals(edge2.end)) ||
+        (intersectionPoint.equals(edge1.end) && intersectionPoint.equals(edge2.start)) ||
+        (intersectionPoint.equals(edge1.end) && intersectionPoint.equals(edge2.end))
       ) {
         return new Point2d(-1, -1);
       }
-      else { return new Point2d(intersectionX, intersectionY); }
+      else { return intersectionPoint; }
     }
 
-    function getLineIntersections() {
+    function getAllEdgeIntersections() {
+      // TODO refractor to use PolygonEdges instead because we get double the ammount of line intersections
       let intersectionPoints = [];
       let edges = getAllEdges();
 
@@ -275,7 +283,7 @@
       if (!polygonFinished) {
         return;
       }
-      const intersections = getLineIntersections();
+      const intersections = getAllEdgeIntersections();
       if (intersections.length > 0) {
         context.fillStyle = intersectionPointColor;
         for (let intersection of intersections) {
@@ -339,9 +347,135 @@
       return new Polygon(points, getAllPolygonEdges());
     }
 
+    function pointInsidePolygon(point, edges) {
+      // cast a random ray from points on the edge (not endpoints) and count edge intersections
+      // if intersection count is odd => point is inside
+      // if intersecting with edgepoint => cast another ray
+      // if all points inside => return true
+
+
+
+      // Cast ray and check for intersections with other edges
+      const intersections = countRayIntersections(point, edges);
+
+      // If the number of intersections is odd, the point is inside the polygon
+      if (intersections % 2 !== 0) {
+        return true;
+      }
+
+      return false;
+    }
+
+    function interpolatePoints(edge, numPoints) {
+      const pointsOnLine = [];
+
+      for (let t = 0; t <= numPoints; t++) {
+        // Linear interpolation between startPoint and endPoint
+        const x = edge.start.x + t / numPoints * (edge.end.x - edge.start.x);
+        const y = edge.start.y + t / numPoints * (edge.end.y - edge.start.y);
+        pointsOnLine.push(new Point2d(x, y));
+      }
+
+      return pointsOnLine;
+    }
+
+    function checkIfEdgeInsidePolygon(edge, edges) {
+      // cast a random ray from points on the edge (not endpoints) and count edge intersections
+      // if intersection count is odd => point is inside
+      // if intersecting with edgepoint => cast another ray
+      // if all points inside => return true
+
+      let points = interpolatePoints(edge, INTERPOLATION_COUNT);
+      for (let point of points) {
+
+        if (point.equals(edge.start) || point.equals(edge.end)) {
+          continue;
+        }
+
+        if (!pointInsidePolygon(point, edges)) {
+          console.log(point.toString() + " not inside Polygon");
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function findRayIntersectionPoint(rayOrigin, rayDirection, edge) {
+      const ox = rayOrigin.x;
+      const oy = rayOrigin.y;
+      const dx = rayDirection.x;
+      const dy = rayDirection.y;
+      const p1x = edge.start.x;
+      const p1y = edge.start.y;
+      const p2x = edge.end.x;
+      const p2y = edge.end.y;
+
+      const det = dx * (p2y - p1y) - dy * (p2x - p1x);
+
+      if (det === 0) {
+        return null;  // Ray and line segment are parallel
+      }
+
+      const t = ((p1x - ox) * (p2y - p1y) - (p1y - oy) * (p2x - p1x)) / det;
+      const u = ((p1x - ox) * dy - (p1y - oy) * dx) / det;
+
+      if (0 <= t && t < Infinity && 0 <= u && u <= 1) {
+        const intersection_x = ox + t * dx;
+        const intersection_y = oy + t * dy;
+
+        const intersectionPoint = new Point2d(intersection_x, intersection_y);
+
+        console.log("Ray intersected with edge " + edge.toString() + " at: " + intersectionPoint.toString());
+
+        const ret = intersectionPoint.equals(edge.start) || intersectionPoint.equals(edge.end) ? new Point2d(-1, -1) : intersectionPoint;
+        return ret;
+      } else {
+        return null;  // No intersection within the line segment
+      }
+    }
+
+    function countRayIntersections(rayOrigin, edges) {
+      let intersections = 0;
+
+      let randomAngle = Math.random() * 2 * Math.PI;
+      let rayDirection = new Point2d(Math.cos(randomAngle), Math.sin(randomAngle));
+
+      for (i = 0; i < edges.length; ++i) {
+        const edge = edges[i];
+        // Check for intersection between the ray and other edges
+        const intersectionPoint = findRayIntersectionPoint(rayOrigin, rayDirection, edge);
+        if (intersectionPoint == null) {
+          // no intersection
+          continue;
+        }
+
+        if (intersectionPoint.isEndpointIntersection()) {
+          // shoot another ray  and repeat iteration
+          console.log("Ray " + rayOrigin.toString() + "with direction " + rayDirection.toString() + "intersected at endpoint");
+          randomAngle = Math.random() * 2 * Math.PI;
+          rayDirection = new Point2d(Math.cos(randomAngle), Math.sin(randomAngle));
+          i--;
+          continue;
+        }
+
+        if (DEBUG_MODE) {
+          context.strokeStyle = "blue";
+          context.lineWidth = 0.5;
+          context.beginPath();
+          context.moveTo(rayOrigin.x, rayOrigin.y);
+          context.lineTo(rayOrigin.x + 40 * rayDirection.x, rayOrigin.y + 40 * rayDirection.y);
+          context.stroke();
+        }
+        intersections++;
+      }
+
+      return intersections;
+    }
+
     function _initialTriangulation() {
       // triangluation by diagonals
       let polygon = getPolygon();
+      const originalPolygon = polygon; // ray intersection needs the original otherwise it would count triangulation edges as new polygons
 
 
       if (polygon.edges.length < 3) {
@@ -349,7 +483,7 @@
         return;
       }
 
-      console.log(polygon.toString());
+      console.log("BEFORE TRIANGULATION:\n" + polygon.toString());
       console.log("Is triangle? " + isTriangle(polygon));
 
 
@@ -370,7 +504,7 @@
           for (let edge of polygon.edges) {
             if (checkIfTwoEdgesIntersect(potentialEdge, edge)) {
               let intersectionpoint = getEdgeIntersectionPoint(potentialEdge, edge);
-              if (!intersectionpoint.isEndpointIntersectionPoint()) {
+              if (!intersectionpoint.isEndpointIntersection()) {
                 isIntersecting = true;
                 break;
               }
@@ -381,17 +515,20 @@
             continue;
           }
 
-          // TODO check if the edge is inside the polygon
+          if (!checkIfEdgeInsidePolygon(potentialEdge, originalPolygon.edges)) {
+            console.log("Edge not inside polygon");
+            continue;
+          }
 
           // add new Edge
           graphAdjList.get(vertex1).push(vertex2);
           graphAdjList.get(vertex2).push(vertex1);
           renderDebugInfo();
-          redraw();
+          drawEdges();
         }
       }
 
-      console.log(polygon.toString());
+      console.log("AFTER TRIANGULATION:\n" + polygon.toString());
 
       // TODO get all triangles in polygons[]
 
