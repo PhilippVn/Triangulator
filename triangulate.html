@@ -21,6 +21,7 @@
           <input type="range" class="form-range" id="triangulationSlider" min="1" max="10" step="1" value="1"
             oninput="updateSliderValue()">
           <p id="sliderValue">Triangulation Level: 1</p>
+          <p id="triangleCount" style="visibility: hidden;">Number of Triangles: x</p>
         </div>
       </div>
       <div id="debugInfo" class="col-md-4" style="visibility: hidden;">
@@ -77,6 +78,10 @@
 
       toString() {
         return `Vertex ${this.identifier}: x=${this.x} y=${this.y}`;
+      }
+
+      equals(otherVertex){
+        return this.identifier == otherVertex.identifier;
       }
     }
 
@@ -524,22 +529,116 @@
           graphAdjList.get(vertex1).push(vertex2);
           graphAdjList.get(vertex2).push(vertex1);
           renderDebugInfo();
-          drawEdges();
         }
       }
 
       console.log("AFTER TRIANGULATION:\n" + polygon.toString());
 
-      // TODO get all triangles in polygons[]
+      // color all triangles in different colors
+      /** @type {Vertex[][]} */
+      let triangles = findAllTriangles();
+      console.log("Triangles");
+      console.log(triangles);
+      for (const triangle of triangles) {
+        const v1 = triangle[0];
+        const v2 = triangle[1];
+        const v3 = triangle[2];
+
+        context.fillStyle = getRandomColor();
+        context.beginPath();
+        context.moveTo(v1.x, v1.y);
+        context.lineTo(v2.x, v2.y);
+        context.lineTo(v3.x, v3.y);
+        context.closePath();
+        context.fill();
+      }
+      document.getElementById("triangleCount").innerHTML = "Triangle Count: " + triangles.length;
+      document.getElementById("triangleCount").style.visibility = "visible";
+    }
+
+    // Function to generate a random color in hex format
+    function getRandomColor() {
+      const letters = '0123456789ABCDEF';
+      let color = '#';
+      for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+      }
+      return color;
+    }
+
+    function findAllTriangles() {
+      // dfs to find circles of length 3 in the graph
+      const cycles = [];
+
+      // iterative dfs
+      function dfs(node) {
+        const stack = []; //  keep track of nodes to be visited
+        const visited = new Set(); // mark nodes as visited to avoid revisiting them
+
+        stack.push({ node, path: [] }); //push start node and empty path on the stack
+
+        while (stack.length > 0) { // while there are still nodes to be visited later/now
+          const { node, path } = stack.pop(); // get last added node => dfs
+
+          if (!visited.has(node)) {
+            visited.add(node); // mark node at visited
+            path.push(node); // add node to current path
+
+            for (const neighbor of graphAdjList.get(node)) { // iterate through all neighbors
+              if (!visited.has(neighbor)) { // neighbor not visited yet 
+                stack.push({ node: neighbor, path: [...path] }); // search from beginning from neighbor next, shallow copy of path to avoid side effects
+              } else {
+                // Neighbor is already in the current path => cycle found
+                const index = path.indexOf(neighbor);
+                const cycle = path.slice(index); // circle = all nodes we visited going from neighbor
+                cycles.push(cycle);
+              }
+            }
+          }
+        }
+      }
+
+      for (const node of graphAdjList.keys()) {
+        dfs(node);
+      }
+
+      // filter all triangles and permutations  of vertices
+      let triangles = [];
+      for (const cycle of cycles) {
+        if (cycle.length == 3) {
+
+          let contains = false;
+          for (const triangle of triangles) {
+            const t1 = triangle[0];
+            const t2 = triangle[1];
+            const t3 = triangle[2];
+
+            const c1 = cycle[0];
+            const c2 = cycle[1];
+            const c3 = cycle[2];
+
+            if (cycle.includes(t1) && cycle.includes(t2) && cycle.includes(t3)) {
+              contains = true;
+              break;
+            }
+          }
+
+          if (!contains) {
+            triangles.push(cycle);
+          }
+
+        }
+      }
+
+      return triangles;
 
     }
+
+
+
 
     // Triangulates 2-n by dividing the triangles from _initialTriangulation in half in each iteration
     function _iterativeTriangulation(n) {
-      // TODO
-    }
-
-    function findAllAtomicPolygons() {
       // TODO
     }
 
