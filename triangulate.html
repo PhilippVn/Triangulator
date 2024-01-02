@@ -552,6 +552,8 @@
         context.closePath();
         context.fill();
       }
+
+      drawEdges();
       document.getElementById("triangleCount").innerHTML = "Triangle Count: " + triangles.length;
       document.getElementById("triangleCount").style.visibility = "visible";
     }
@@ -689,6 +691,7 @@
       lastVertex = null;
       polygonFinished = false;
       clearCanvas();
+      document.getElementById("triangleCount").style.visibility = "hidden";
       console.clear();
       renderDebugInfo();
     }
