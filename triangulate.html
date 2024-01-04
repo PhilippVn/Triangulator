@@ -39,7 +39,7 @@
 
 
   <!-- Include Bootstrap JS (optional) -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script> -->
 
   <!-- Your custom JavaScript for canvas interactions -->
 
@@ -49,14 +49,14 @@
     const context = canvas.getContext('2d');
 
     const snippingRadius = 8;
-    const edgeStrokeWidth = 4;
+    const edgeStrokeWidth = 2;
     const circleStrokeWidth = 1;
     const intersectionPointRadius = 5;
     const draggedEdgeColor = "darkgray";
     const finalEdgeColor = "black";
     const intersectionPointColor = "red";
 
-    const DEBUG_MODE = false;
+    const DEBUG_MODE = true;
     const INTERPOLATION_COUNT = 100;
 
     let triangulationLevel = 1;
@@ -247,26 +247,23 @@
     }
 
     function getAllEdgeIntersections() {
-      // TODO refractor to use PolygonEdges instead because we get double the ammount of line intersections
       let intersectionPoints = [];
-      let edges = getAllEdges();
-
+      let edges = getAllPolygonEdges();
       for (let edge of edges) {
         for (let otherEdge of edges) {
-          let edgePoint1 = edge[0];
-          let edgePoint2 = edge[1];
-          let otherEdgePoint1 = otherEdge[0];
-          let otherEdgePoint2 = otherEdge[1];
-
-          if (checkIfTwoEdgesIntersect(new Edge(edgePoint1, edgePoint2), new Edge(otherEdgePoint1, otherEdgePoint2))) {
-            // Intersection point
-            let intersectionPoint = getEdgeIntersectionPoint(new Edge(edgePoint1, edgePoint2), new Edge(otherEdgePoint1, otherEdgePoint2));
-            if (!(intersectionPoint.x < 0 && intersectionPoint.y < 0)) {
+          // filter for self intersection
+          if(edge.start.equals(otherEdge.start) && edge.end.equals(otherEdge.end)){
+            continue;
+          }
+          if(checkIfTwoEdgesIntersect(edge,otherEdge)){
+            let intersectionPoint = getEdgeIntersectionPoint(edge,otherEdge);
+            if (!intersectionPoint.isEndpointIntersection()) {
               intersectionPoints.push(intersectionPoint);
             }
           }
         }
       }
+
       return intersectionPoints;
     }
 
@@ -398,7 +395,6 @@
         }
 
         if (!pointInsidePolygon(point, edges)) {
-          console.log(point.toString() + " not inside Polygon");
           return false;
         }
       }
@@ -430,8 +426,6 @@
 
         const intersectionPoint = new Point2d(intersection_x, intersection_y);
 
-        console.log("Ray intersected with edge " + edge.toString() + " at: " + intersectionPoint.toString());
-
         const ret = intersectionPoint.equals(edge.start) || intersectionPoint.equals(edge.end) ? new Point2d(-1, -1) : intersectionPoint;
         return ret;
       } else {
@@ -456,7 +450,6 @@
 
         if (intersectionPoint.isEndpointIntersection()) {
           // shoot another ray  and repeat iteration
-          console.log("Ray " + rayOrigin.toString() + "with direction " + rayDirection.toString() + "intersected at endpoint");
           randomAngle = Math.random() * 2 * Math.PI;
           rayDirection = new Point2d(Math.cos(randomAngle), Math.sin(randomAngle));
           i--;
@@ -488,7 +481,7 @@
         return;
       }
 
-      console.log("BEFORE TRIANGULATION:\n" + polygon.toString());
+      console.log("BEFORE TRIANGULATION:\n" + polygon);
       console.log("Is triangle? " + isTriangle(polygon));
 
 
@@ -521,7 +514,6 @@
           }
 
           if (!checkIfEdgeInsidePolygon(potentialEdge, originalPolygon.edges)) {
-            console.log("Edge not inside polygon");
             continue;
           }
 
@@ -532,7 +524,7 @@
         }
       }
 
-      console.log("AFTER TRIANGULATION:\n" + polygon.toString());
+      console.log("AFTER TRIANGULATION:\n" + polygon);
 
       // color all triangles in different colors
       /** @type {Vertex[][]} */
@@ -711,7 +703,7 @@
 
     function renderDebugInfo() {
       if (DEBUG_MODE) {
-        document.getElementById("debugInfo").classList.toggle('d-none');
+        document.getElementById("debugInfo").classList.replace('d-none','d-block');
       }
       document.getElementById("graphAdjListDebug").innerText = "graphAdjList: " + map2String(graphAdjList);
       document.getElementById("polygonFinishedDebug").innerText = "polygonFinished: " + polygonFinished;
